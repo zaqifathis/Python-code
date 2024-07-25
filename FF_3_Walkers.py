@@ -15,28 +15,21 @@ import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
 
-"""
-WALKER ALGORITHM
-project: Freeform4BIM
-
-input:
- - skeleton pointcloud
- - list of points for the walker
- - neighbour size
-
-output:
- - ordered list of points
-"""
+import Rhino.UI
+import Eto.Drawing as drawing
+import Eto.Forms as forms
 
 ################################################################################
 
 class Walkers():
-    def __init__(self, iStart, skeleton_pc):
+    def __init__(self, iStart, skeleton_pc, iNeighbours, max_walker_step):
         self.iStart = iStart
         self.skeleton_pc = skeleton_pc
         self.rtree = rg.RTree.CreatePointCloudTree(skeleton_pc)
         self.scope_of_points = skeleton_pc.GetPoints()
         self.scope_of_colors = []
+        self.iNeighbours = iNeighbours
+        self.max_walker_step = max_walker_step
 
         self.startPt = rg.Point3d(0,0,0)
         self.endPt = rg.Point3d(0,0,0)
@@ -105,7 +98,7 @@ class Walkers():
 
     def walk(self):
         ptCheck = [self.startPt]
-        neighbourPt_idx = self.rtree.Point3dKNeighbors(self.scope_of_points, ptCheck, iNeighbours + 1)
+        neighbourPt_idx = self.rtree.Point3dKNeighbors(self.scope_of_points, ptCheck, self.iNeighbours + 1)
         n_points = []
         n_colors = []
 
@@ -134,7 +127,7 @@ class Walkers():
             self.results.append(self.startPt)
             print("starPt", i)
 
-            for j in range(max_walker_step):
+            for j in range(self.max_walker_step):
                 if self.finished == False:
                     self.walk()
                 else:
@@ -145,6 +138,7 @@ class Walkers():
                 self.results.append(self.endPt)
                 self.results = rg.Point3d.SortAndCullPointList(self.results, 0.01)
 
+################################################################################
   
 class Skeleton(): 
     def __init__(self, pcloud, neighbourSize, iterations):
@@ -252,6 +246,8 @@ class Skeleton():
         # get skeleton pointcloud
         self.result.AddRange(self.points)
 
+################################################################################
+
 class EscapeKeyHelper:
     # Constructor
     def __init__(self):
@@ -268,6 +264,89 @@ class EscapeKeyHelper:
     def EscapeKeyPressed(self):
         print("exit function")
         return self.escape_key_pressed
+    
+################################################################################
+
+class WalkerOptionsDialog(forms.Dialog[bool]):
+ 
+    # Dialog box Class initializer
+    def __init__(self):
+        super().__init__()
+        # Initialize dialog box
+        self.Title = 'Patch Options'
+        self.Padding = drawing.Padding(10)
+        self.Resizable = False
+ 
+        # Grid U
+        self.gridU_label = forms.Label()
+        self.gridU_label.Text = 'U-Grid size:'
+        self.gridU_textbox = forms.TextBox()
+        self.gridU_textbox.Text = ""
+
+        # Grid V
+        self.gridV_label = forms.Label()
+        self.gridV_label.Text = 'V-Grid size:'
+        self.gridV_textbox = forms.TextBox()
+        self.gridV_textbox.Text = ""
+
+        #flexibility
+        self.flex_label = forms.Label()
+        self.flex_label.Text = "Flexibility:"
+        self.flex_updown = forms.NumericUpDown()
+        self.flex_updown.DecimalPlaces = 1
+        self.flex_updown.Increment = 0.1
+        self.flex_updown.MaxValue = 100
+        self.flex_updown.MinValue = 0.1
+        self.flex_updown.Value = 100
+ 
+        # Create the default button
+        self.DefaultButton = forms.Button()
+        self.DefaultButton.Text ='OK'
+        self.DefaultButton.Click += self.OnOKButtonClick
+ 
+        # Create the abort button
+        self.AbortButton = forms.Button()
+        self.AbortButton.Text ='Cancel'
+        self.AbortButton.Click += self.OnCloseButtonClick
+ 
+        # Create a table layout and add all the controls
+        layout = forms.DynamicLayout()
+        layout.Spacing = drawing.Size(5, 5)
+        layout.AddRow(self.gridU_label, self.gridU_textbox)
+        layout.AddRow(self.gridV_label, self.gridV_textbox)
+        layout.AddRow(None) # spacer
+        layout.AddRow(self.flex_label, self.flex_updown)
+        layout.AddRow(None) # spacer
+        layout.AddRow(self.DefaultButton, self.AbortButton)
+ 
+        # Set the dialog content
+        self.Content = layout
+ 
+    # Get the value of the textbox
+    def GetGrid_U(self):
+        return self.gridU_textbox.Text
+    
+    def GetGrid_V(self):
+        return self.gridV_textbox.Text
+ 
+    # Close button click handler
+    def OnCloseButtonClick(self, sender, e):
+        self.Close(False)
+ 
+    # OK button click handler
+    def OnOKButtonClick(self, sender, e):
+        if self.gridU_textbox.Text == "" or self.gridV_textbox.Text == "":
+            self.Close(False)
+        else:
+            self.Close(True)
+
+def RequestOption():
+    dialog = WalkerOptionsDialog()
+    rc = dialog.ShowModal(Rhino.UI.RhinoEtoApp.MainWindow)
+    if (rc):
+        return True
+    else:
+        return False
     
 ################################################################################
 
@@ -290,7 +369,7 @@ def runWalkers():
     controlpoints = rs.GetInteger("num of control points", 10, 3, 100)
     if (helper.EscapeKeyPressed):return 
     
-    ################################################################################
+    #----------------------------------------------------------------
 
     #sorted input points
     iStart = rg.Point3d.SortAndCullPointList(input_pts, 0.01)
@@ -300,7 +379,7 @@ def runWalkers():
     skeleton_pc = rh.DocObjects.ObjRef.PointCloud(ref)
 
     #walkers
-    walkers = Walkers(iStart, skeleton_pc)
+    walkers = Walkers(iStart, skeleton_pc, iNeighbours, max_walker_step)
     walkers.getColor()
     walkers.run()
     results_points = list(walkers.results)

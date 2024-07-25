@@ -13,6 +13,8 @@ import Eto.Forms as forms
 import System
 import System.Collections.Generic
 
+import FF_Attributes
+
 ################################################################################
 
 class PatchOptionsDialog(forms.Dialog[bool]):
@@ -161,9 +163,7 @@ def RunPatchSurface():
     patch = rg.Brep.CreatePatch(geom, init_srf, gridU, gridV, True, False, 0.1, flexibility, 0.001,fixedEdges, 100 )
 
     #object attributes
-    prop = rh.DocObjects.ObjectAttributes()
-    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
-    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
+    prop = FF_Attributes.getObjectProperties()
 
     sc.doc.Objects.AddBrep(patch, prop)
     print("patch surface is done!")

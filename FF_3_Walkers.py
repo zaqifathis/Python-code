@@ -19,6 +19,8 @@ import Rhino.UI
 import Eto.Drawing as drawing
 import Eto.Forms as forms
 
+import FF_Attributes
+
 ################################################################################
 
 class Walkers():
@@ -273,31 +275,39 @@ class WalkerOptionsDialog(forms.Dialog[bool]):
     def __init__(self):
         super().__init__()
         # Initialize dialog box
-        self.Title = 'Patch Options'
+        self.Title = 'Walker Options'
         self.Padding = drawing.Padding(10)
         self.Resizable = False
- 
-        # Grid U
-        self.gridU_label = forms.Label()
-        self.gridU_label.Text = 'U-Grid size:'
-        self.gridU_textbox = forms.TextBox()
-        self.gridU_textbox.Text = ""
 
-        # Grid V
-        self.gridV_label = forms.Label()
-        self.gridV_label.Text = 'V-Grid size:'
-        self.gridV_textbox = forms.TextBox()
-        self.gridV_textbox.Text = ""
+        #neighbour
+        self.neighbour_label = forms.Label()
+        self.neighbour_label.Text = "Neighbour size:"
+        self.neighbour_updown = forms.NumericUpDown()
+        self.neighbour_updown.DecimalPlaces = 0
+        self.neighbour_updown.Increment = 1
+        self.neighbour_updown.MaxValue = 100
+        self.neighbour_updown.MinValue = 10
+        self.neighbour_updown.Value = 20
 
-        #flexibility
-        self.flex_label = forms.Label()
-        self.flex_label.Text = "Flexibility:"
-        self.flex_updown = forms.NumericUpDown()
-        self.flex_updown.DecimalPlaces = 1
-        self.flex_updown.Increment = 0.1
-        self.flex_updown.MaxValue = 100
-        self.flex_updown.MinValue = 0.1
-        self.flex_updown.Value = 100
+        #walker steps
+        self.steps_label = forms.Label()
+        self.steps_label.Text = "Max walker steps:"
+        self.steps_updown = forms.NumericUpDown()
+        self.steps_updown.DecimalPlaces = 0
+        self.steps_updown.Increment = 1
+        self.steps_updown.MaxValue = 10000
+        self.steps_updown.MinValue = 100
+        self.steps_updown.Value = 500
+
+        #control points
+        self.cpt_label = forms.Label()
+        self.cpt_label.Text = "Control points of the output curve:"
+        self.cpt_updown = forms.NumericUpDown()
+        self.cpt_updown.DecimalPlaces = 0
+        self.cpt_updown.Increment = 1
+        self.cpt_updown.MaxValue = 100
+        self.cpt_updown.MinValue = 3
+        self.cpt_updown.Value = 10
  
         # Create the default button
         self.DefaultButton = forms.Button()
@@ -312,10 +322,9 @@ class WalkerOptionsDialog(forms.Dialog[bool]):
         # Create a table layout and add all the controls
         layout = forms.DynamicLayout()
         layout.Spacing = drawing.Size(5, 5)
-        layout.AddRow(self.gridU_label, self.gridU_textbox)
-        layout.AddRow(self.gridV_label, self.gridV_textbox)
-        layout.AddRow(None) # spacer
-        layout.AddRow(self.flex_label, self.flex_updown)
+        layout.AddRow(self.neighbour_label, self.neighbour_updown)
+        layout.AddRow(self.steps_label, self.steps_updown)
+        layout.AddRow(self.cpt_label, self.cpt_updown)
         layout.AddRow(None) # spacer
         layout.AddRow(self.DefaultButton, self.AbortButton)
  
@@ -323,11 +332,14 @@ class WalkerOptionsDialog(forms.Dialog[bool]):
         self.Content = layout
  
     # Get the value of the textbox
-    def GetGrid_U(self):
-        return self.gridU_textbox.Text
+    def GetNeighbourSize(self):
+        return self.neighbour_updown.Value
     
-    def GetGrid_V(self):
-        return self.gridV_textbox.Text
+    def GetSteps(self):
+        return self.steps_updown.Value
+ 
+    def GetControlPoints(self):
+        return self.cpt_updown.Value
  
     # Close button click handler
     def OnCloseButtonClick(self, sender, e):
@@ -335,20 +347,23 @@ class WalkerOptionsDialog(forms.Dialog[bool]):
  
     # OK button click handler
     def OnOKButtonClick(self, sender, e):
-        if self.gridU_textbox.Text == "" or self.gridV_textbox.Text == "":
-            self.Close(False)
-        else:
-            self.Close(True)
+        self.Close(True)
 
 def RequestOption():
     dialog = WalkerOptionsDialog()
     rc = dialog.ShowModal(Rhino.UI.RhinoEtoApp.MainWindow)
     if (rc):
-        return True
+        return True, (int(dialog.GetNeighbourSize()), int(dialog.GetSteps()), int(dialog.GetControlPoints()))
     else:
-        return False
+        return False, (int(dialog.GetNeighbourSize()), int(dialog.GetSteps()), int(dialog.GetControlPoints()))
     
 ################################################################################
+
+def rebuildCurve(curve, target_controlPoint):
+    params = curve.DivideByCount(target_controlPoint, True)
+    pts = [curve.PointAt(p) for p in params]
+    final_curve = rg.Curve.CreateInterpolatedCurve(pts, 3)
+    return final_curve
 
 def runWalkers():
     helper = EscapeKeyHelper()
@@ -359,16 +374,11 @@ def runWalkers():
 
     input_pts = rs.GetPoints(False, False, "Select the start pt", "Select the next point or press spacebar if finished")
     if (helper.EscapeKeyPressed):return 
-
-    iNeighbours = rs.GetInteger("Neighbour size", 20, 10, 100)
-    if (helper.EscapeKeyPressed):return 
-
-    max_walker_step = rs.GetInteger("Max walker step", 700, 100, 10000) #if you wanna specify the steps
-    if (helper.EscapeKeyPressed):return 
-
-    controlpoints = rs.GetInteger("num of control points", 10, 3, 100)
-    if (helper.EscapeKeyPressed):return 
     
+    bool_op, option = RequestOption()
+    iNeighbours, max_walker_step, controlpoints = option
+    if bool_op == False: return
+
     #----------------------------------------------------------------
 
     #sorted input points
@@ -392,15 +402,13 @@ def runWalkers():
     result= skeleton.result
     skel_pts = result.GetPoints()
     crv = rg.Curve.CreateInterpolatedCurve(skel_pts, 3)
-    crv.Rebuild(controlpoints, 3, True)
+    final_curve = rebuildCurve(crv, controlpoints)
 
     #object attributes
-    prop = rh.DocObjects.ObjectAttributes()
-    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
-    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
-
+    prop = FF_Attributes.getObjectProperties()
+    
     #bake object
-    sc.doc.Objects.AddCurve(crv, prop)
+    sc.doc.Objects.AddCurve(final_curve, prop)
 
     print("walkers is done!")
 

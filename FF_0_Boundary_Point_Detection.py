@@ -19,6 +19,7 @@ import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
 
+import FF_Attributes
 
 ################################################################################
 
@@ -165,9 +166,7 @@ def runBoundaryPointDetection():
     print("Estimated number of noise points: %d" % n_noise_)
 
     #object attributes
-    prop = rh.DocObjects.ObjectAttributes()
-    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
-    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
+    prop = FF_Attributes.getObjectProperties()
 
     if n_clusters_ > input_targetGroup:
         final_pcl = rg.PointCloud(ptsArr)

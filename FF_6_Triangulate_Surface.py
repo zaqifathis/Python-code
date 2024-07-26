@@ -10,6 +10,7 @@ import Rhino as rh
 import Rhino.Geometry as rg
 import ghpythonlib.components as gc
 
+import FF_Attributes
 
 ################################################################################
 
@@ -341,9 +342,7 @@ def runTriangularSurface():
     final_surfaces = compute_network_surface(baseSrf, clusters, gridSize)
 
     #object attributes
-    prop = rh.DocObjects.ObjectAttributes()
-    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
-    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
+    prop = FF_Attributes.getObjectProperties()
 
     #bake object
     [sc.doc.Objects.AddSurface(surface, prop) for surface in final_surfaces]

@@ -16,8 +16,15 @@ import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
 
+import FF_Attributes
 
 ################################################################################
+
+def rebuildCurve(curve, target_controlPoint):
+    params = curve.DivideByCount(target_controlPoint, True)
+    pts = [curve.PointAt(p) for p in params]
+    final_curve = rg.Curve.CreateInterpolatedCurve(pts, 3)
+    return final_curve
 
 def joinEndCorner(clusteredPoints, cornerPoints):
     results = []
@@ -237,10 +244,7 @@ def runEdgeCreation():
     combined = joinEndCorner(clusteredPoints, cornerPoints)
 
     #object attributes
-    #object attributes
-    prop = rh.DocObjects.ObjectAttributes()
-    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
-    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
+    prop = FF_Attributes.getObjectProperties()
 
     for c in combined:
 
@@ -254,10 +258,10 @@ def runEdgeCreation():
         skel_pts = result.GetPoints()
 
         crv = rg.Curve.CreateInterpolatedCurve(skel_pts, 3)
-        crv.Rebuild(controlpoints, 3, True)
+        final_curve = rebuildCurve(crv, controlpoints)
         
         #bake object
-        sc.doc.Objects.AddCurve(crv, prop)
+        sc.doc.Objects.AddCurve(final_curve, prop)
 
     print("edge creation is done!")
 

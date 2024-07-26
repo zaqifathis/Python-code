@@ -16,6 +16,10 @@ import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
 
+import Rhino.UI
+import Eto.Drawing as drawing
+import Eto.Forms as forms
+
 import FF_Attributes
 
 ################################################################################
@@ -56,6 +60,8 @@ def joinEndCorner(clusteredPoints, cornerPoints):
         results.append(sortedCLuster)
         
     return results
+
+################################################################################
 
 class Skeleton(): 
     def __init__(self, pcloud, neighbourSize, iterations):
@@ -163,6 +169,8 @@ class Skeleton():
         # get skeleton pointcloud
         self.result.AddRange(self.points)
 
+################################################################################
+
 class EscapeKeyHelper:
     # Constructor
     def __init__(self):
@@ -182,6 +190,82 @@ class EscapeKeyHelper:
     
 ################################################################################
 
+class EdgeCreationOptionsDialog(forms.Dialog[bool]):
+ 
+    # Dialog box Class initializer
+    def __init__(self):
+        super().__init__()
+        # Initialize dialog box
+        self.Title = 'Edge Creation Options'
+        self.Padding = drawing.Padding(10)
+        self.Resizable = False
+
+        #neighbour
+        self.neighbour_label = forms.Label()
+        self.neighbour_label.Text = "Neighbours to be removed:"
+        self.neighbour_updown = forms.NumericUpDown()
+        self.neighbour_updown.DecimalPlaces = 0
+        self.neighbour_updown.Increment = 1
+        self.neighbour_updown.MaxValue = 100
+        self.neighbour_updown.MinValue = 5
+        self.neighbour_updown.Value = 7
+
+        #control points
+        self.cpt_label = forms.Label()
+        self.cpt_label.Text = "Control points of the output curve:"
+        self.cpt_updown = forms.NumericUpDown()
+        self.cpt_updown.DecimalPlaces = 0
+        self.cpt_updown.Increment = 1
+        self.cpt_updown.MaxValue = 100
+        self.cpt_updown.MinValue = 3
+        self.cpt_updown.Value = 10
+ 
+        # Create the default button
+        self.DefaultButton = forms.Button()
+        self.DefaultButton.Text ='OK'
+        self.DefaultButton.Click += self.OnOKButtonClick
+ 
+        # Create the abort button
+        self.AbortButton = forms.Button()
+        self.AbortButton.Text ='Cancel'
+        self.AbortButton.Click += self.OnCloseButtonClick
+ 
+        # Create a table layout and add all the controls
+        layout = forms.DynamicLayout()
+        layout.Spacing = drawing.Size(5, 5)
+        layout.AddRow(self.neighbour_label, self.neighbour_updown)
+        layout.AddRow(self.cpt_label, self.cpt_updown)
+        layout.AddRow(None) # spacer
+        layout.AddRow(self.DefaultButton, self.AbortButton)
+ 
+        # Set the dialog content
+        self.Content = layout
+ 
+    # Get the value of the textbox
+    def GetNeighbourSize(self):
+        return self.neighbour_updown.Value 
+ 
+    def GetControlPoints(self):
+        return self.cpt_updown.Value
+ 
+    # Close button click handler
+    def OnCloseButtonClick(self, sender, e):
+        self.Close(False)
+ 
+    # OK button click handler
+    def OnOKButtonClick(self, sender, e):
+        self.Close(True)
+
+def RequestOption():
+    dialog = EdgeCreationOptionsDialog()
+    rc = dialog.ShowModal(Rhino.UI.RhinoEtoApp.MainWindow)
+    if (rc):
+        return True, (int(dialog.GetNeighbourSize()), int(dialog.GetControlPoints()))
+    else:
+        return False, (int(dialog.GetNeighbourSize()), int(dialog.GetControlPoints()))
+    
+################################################################################
+
 def runEdgeCreation():
     helper = EscapeKeyHelper()
 
@@ -194,14 +278,12 @@ def runEdgeCreation():
 
     cornerPoints = rs.GetPoints(False, False, "Select corner points", "Select the next point or press spacebar if finished")
     if (helper.EscapeKeyPressed):return 
-    
-    controlpoints = rs.GetInteger("num of control points", 10, 3, 100)
-    if (helper.EscapeKeyPressed):return 
 
-    cullNeighbourSize = rs.GetInteger("num of neighbours to be removed around corner", 7, 5, 50)
-    if (helper.EscapeKeyPressed):return 
+    bool_op, option = RequestOption()
+    cullNeighbourSize, controlpoints = option
+    if bool_op == False: return
     
-    ################################################################################
+    #----------------------------------------------------------------
 
     ref = rh.DocObjects.ObjRef(sc.doc.ActiveDoc, pcloud_id)
     pcloud = rh.DocObjects.ObjRef.PointCloud(ref)

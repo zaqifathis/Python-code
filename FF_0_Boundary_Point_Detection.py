@@ -19,6 +19,10 @@ import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
 
+import Rhino.UI
+import Eto.Drawing as drawing
+import Eto.Forms as forms
+
 import FF_Attributes
 
 ################################################################################
@@ -86,6 +90,8 @@ def getAngularGap(localPoints):
 
     return results
 
+################################################################################
+
 class EscapeKeyHelper:
     # Constructor
     def __init__(self):
@@ -105,6 +111,111 @@ class EscapeKeyHelper:
     
 ################################################################################
 
+
+class BpdOptionsDialog(forms.Dialog[bool]):
+ 
+    # Dialog box Class initializer
+    def __init__(self):
+        super().__init__()
+        # Initialize dialog box
+        self.Title = 'BPD Options'
+        self.Padding = drawing.Padding(10)
+        self.Resizable = False
+
+        #neighbour
+        self.neighbour_label = forms.Label()
+        self.neighbour_label.Text = "Neighbour size:"
+        self.neighbour_updown = forms.NumericUpDown()
+        self.neighbour_updown.DecimalPlaces = 0
+        self.neighbour_updown.Increment = 1
+        self.neighbour_updown.MaxValue = 100
+        self.neighbour_updown.MinValue = 10
+        self.neighbour_updown.Value = 15
+
+        #Angle to test
+        self.angle_label = forms.Label()
+        self.angle_label.Text = "Angle to tests:"
+        self.angle_updown = forms.NumericUpDown()
+        self.angle_updown.DecimalPlaces = 0
+        self.angle_updown.Increment = 1
+        self.angle_updown.MaxValue = 360
+        self.angle_updown.MinValue = 50
+        self.angle_updown.Value = 90
+
+        #target group
+        self.target_label = forms.Label()
+        self.target_label.Text = "Target group:"
+        self.target_updown = forms.NumericUpDown()
+        self.target_updown.DecimalPlaces = 0
+        self.target_updown.Increment = 1
+        self.target_updown.MaxValue = 50
+        self.target_updown.MinValue = 1
+        self.target_updown.Value = 1
+
+        #alpha size
+        self.alpha_label = forms.Label()
+        self.alpha_label.Text = "Alpha size:"
+        self.alpha_updown = forms.NumericUpDown()
+        self.alpha_updown.DecimalPlaces = 1
+        self.alpha_updown.Increment = 0.1
+        self.alpha_updown.MaxValue = 10
+        self.alpha_updown.MinValue = 0.1
+        self.alpha_updown.Value = 0.5
+ 
+        # Create the default button
+        self.DefaultButton = forms.Button()
+        self.DefaultButton.Text ='OK'
+        self.DefaultButton.Click += self.OnOKButtonClick
+ 
+        # Create the abort button
+        self.AbortButton = forms.Button()
+        self.AbortButton.Text ='Cancel'
+        self.AbortButton.Click += self.OnCloseButtonClick
+ 
+        # Create a table layout and add all the controls
+        layout = forms.DynamicLayout()
+        layout.Spacing = drawing.Size(5, 5)
+        layout.AddRow(self.neighbour_label, self.neighbour_updown)
+        layout.AddRow(self.angle_label, self.angle_updown)
+        layout.AddRow(self.target_label, self.target_updown)
+        layout.AddRow(self.alpha_label, self.alpha_updown)
+        layout.AddRow(None) # spacer
+        layout.AddRow(self.DefaultButton, self.AbortButton)
+ 
+        # Set the dialog content
+        self.Content = layout
+ 
+    # Get the value of the textbox
+    def GetNeighbourSize(self):
+        return self.neighbour_updown.Value
+    
+    def GetAngle(self):
+        return self.angle_updown.Value
+ 
+    def GetTarget(self):
+        return self.target_updown.Value
+    
+    def GetAlpha(self):
+        return self.alpha_updown.Value
+ 
+    # Close button click handler
+    def OnCloseButtonClick(self, sender, e):
+        self.Close(False)
+ 
+    # OK button click handler
+    def OnOKButtonClick(self, sender, e):
+        self.Close(True)
+
+def RequestOption():
+    dialog = BpdOptionsDialog()
+    rc = dialog.ShowModal(Rhino.UI.RhinoEtoApp.MainWindow)
+    if (rc):
+        return True, (int(dialog.GetNeighbourSize()), int(dialog.GetAngle()), int(dialog.GetTarget()), dialog.GetAlpha())
+    else:
+        return False, (int(dialog.GetNeighbourSize()), int(dialog.GetAngle()), int(dialog.GetTarget()), dialog.GetAlpha())
+    
+################################################################################
+
 def runBoundaryPointDetection():
     helper = EscapeKeyHelper()
 
@@ -112,19 +223,11 @@ def runBoundaryPointDetection():
     pcloud_id = rs.GetObject("Select pointcloud", 2, False, False)
     if pcloud_id == None: return
 
-    input_neighbourSize = rs.GetInteger("Neighbour size", 15, 10, 100)
-    if (helper.EscapeKeyPressed):return 
-
-    input_angleTest = rs.GetInteger("Angle to test (in degree)", 90, 50, 360)
-    if (helper.EscapeKeyPressed):return 
-
-    input_targetGroup = rs.GetInteger("target group", 1, 1, 50)
-    if (helper.EscapeKeyPressed):return 
-
-    input_aplha = rs.GetReal("alpha size (A distance scaling parameter for clustering)", 0.5, 0.1, 10)
-    if (helper.EscapeKeyPressed):return 
+    bool_op, option = RequestOption()
+    input_neighbourSize, input_angleTest, input_targetGroup, input_aplha = option
+    if bool_op == False: return
     
-    ################################################################################
+    #----------------------------------------------------------------
 
     ref = rh.DocObjects.ObjRef(sc.doc.ActiveDoc, pcloud_id)
     pcloud = rh.DocObjects.ObjRef.PointCloud(ref)
@@ -157,7 +260,7 @@ def runBoundaryPointDetection():
             
     #CLUSTERING ALGORITHM USING HDBSCAN FROM SCIKIT-LEARN 
     #convert point to numpy array
-    hdb = HDBSCAN(alpha= 0.5).fit(pts_np)
+    hdb = HDBSCAN(alpha= input_aplha).fit(pts_np)
     labels = hdb.labels_
 
     n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)

@@ -28,7 +28,7 @@ def runCloudCluster():
     )
     if pcloud_id == None: return
 
-    ################################################################################
+    #----------------------------------------------------------------
 
     ref = rh.DocObjects.ObjRef(sc.doc.ActiveDoc, pcloud_id)
     pcloud = rh.DocObjects.ObjRef.PointCloud(ref)

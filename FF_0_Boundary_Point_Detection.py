@@ -23,8 +23,6 @@ import Rhino.UI
 import Eto.Drawing as drawing
 import Eto.Forms as forms
 
-import FF_Attributes
-
 ################################################################################
 
 def pointTransformation(pt, initialPlane, targetPlane):
@@ -269,7 +267,9 @@ def runBoundaryPointDetection():
     print("Estimated number of noise points: %d" % n_noise_)
 
     #object attributes
-    prop = FF_Attributes.getObjectProperties()
+    prop = rh.DocObjects.ObjectAttributes()
+    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
+    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
 
     if n_clusters_ > input_targetGroup:
         final_pcl = rg.PointCloud(ptsArr)

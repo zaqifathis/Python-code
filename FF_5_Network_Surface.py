@@ -9,8 +9,6 @@ import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
 
-import FF_Attributes
-
 ################################################################################
 
 def addFirstAndLastCurve(firstCrv, LastCrv, grid):
@@ -170,7 +168,9 @@ def runNetworkSurface():
         return
 
     #object attributes
-    prop = FF_Attributes.getObjectProperties()
+    prop = rh.DocObjects.ObjectAttributes()
+    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
+    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
 
     #bake object
     sc.doc.Objects.AddSurface(final_surface, prop)

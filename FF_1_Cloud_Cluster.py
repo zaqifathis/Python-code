@@ -15,8 +15,6 @@ import System
 import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
-
-import FF_Attributes
     
 ################################################################################
 
@@ -58,7 +56,9 @@ def runCloudCluster():
             clusteredPoints[l].append(points[idx])
 
     #object attributes
-    prop = FF_Attributes.getObjectProperties()
+    prop = rh.DocObjects.ObjectAttributes()
+    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
+    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
 
     for cl in clusteredPoints:
         final_pcl = rg.PointCloud(cl)

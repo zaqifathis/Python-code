@@ -20,8 +20,6 @@ import Rhino.UI
 import Eto.Drawing as drawing
 import Eto.Forms as forms
 
-import FF_Attributes
-
 ################################################################################
 
 def rebuildCurve(curve, target_controlPoint):
@@ -326,7 +324,9 @@ def runEdgeCreation():
     combined = joinEndCorner(clusteredPoints, cornerPoints)
 
     #object attributes
-    prop = FF_Attributes.getObjectProperties()
+    prop = rh.DocObjects.ObjectAttributes()
+    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
+    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
 
     for c in combined:
 

@@ -19,7 +19,6 @@ import Rhino.UI
 import Eto.Drawing as drawing
 import Eto.Forms as forms
 
-import FF_Attributes
 
 ################################################################################
 
@@ -405,7 +404,9 @@ def runWalkers():
     final_curve = rebuildCurve(crv, controlpoints)
 
     #object attributes
-    prop = FF_Attributes.getObjectProperties()
+    prop = rh.DocObjects.ObjectAttributes()
+    prop.ObjectColor = System.Drawing.Color.FromArgb(0, 0, 255)
+    prop.ColorSource = rh.DocObjects.ObjectColorSource.ColorFromObject
     
     #bake object
     sc.doc.Objects.AddCurve(final_curve, prop)

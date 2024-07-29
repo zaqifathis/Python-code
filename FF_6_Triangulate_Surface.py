@@ -8,7 +8,7 @@ import System
 import System.Collections.Generic
 import Rhino as rh
 import Rhino.Geometry as rg
-import ghpythonlib.components as gc
+from ghpythonlib.components import ConvexHull
 
 ################################################################################
 
@@ -17,7 +17,7 @@ def get_convexhull(boundCurves):
     for cr in boundCurves:
         cornerPts.append(cr.PointAtStart)
         cornerPts.append(cr.PointAtEnd)
-    hull = gc.ConvexHull(cornerPts, rg.Plane.WorldXY)[0] #convexhull
+    hull = ConvexHull(cornerPts, rg.Plane.WorldXY)[0] #convexhull
     plyline = hull.ToPolyline()
     explodedHull = plyline.GetSegments()
     return explodedHull
@@ -153,7 +153,7 @@ def compute_clusters(boundarySeg, subCurves):
 
     return clusters
 
-def compute_network_surface(baseSrf, clusters, gridSize):
+def compute_network_surface(pcloud, baseSrf, clusters, gridSize):
     #get domain
     domain = []
     for i in range(1, gridSize):
@@ -183,10 +183,13 @@ def compute_network_surface(baseSrf, clusters, gridSize):
         pulledUpts = [baseSrf.PullPointsToFace(u_pts, 0.1) for u_pts in Upoints]
         pulledVpts = [baseSrf.PullPointsToFace(v_pts, 0.1) for v_pts in Vpoints]
 
+        #pull point to closest pointcloud with min angle
+        final_pulled_Upts = [pulled_pts_to_pcloud(pcloud, baseSrf, u_pts) for u_pts in pulledUpts]
+        final_pulled_Vpts = [pulled_pts_to_pcloud(pcloud, baseSrf, v_pts) for v_pts in pulledVpts]
 
         #add first and end point to the pulled pts from boundary
-        final_U_Pts = [addStartandEndPtToList(srfFace, domain[idx], 0, upts) for idx, upts in enumerate(pulledUpts)]
-        final_V_Pts = [addStartandEndPtToList(srfFace, domain[idx], 1, vpts) for idx, vpts in enumerate(pulledVpts)]
+        final_U_Pts = [addStartandEndPtToList(srfFace, domain[idx], 0, upts) for idx, upts in enumerate(final_pulled_Upts)]
+        final_V_Pts = [addStartandEndPtToList(srfFace, domain[idx], 1, vpts) for idx, vpts in enumerate(final_pulled_Vpts)]
 
         #interpolate curves
         grid_U_curves = [rg.Curve.CreateInterpolatedCurve(upts, 3) for upts in final_U_Pts]
@@ -204,6 +207,44 @@ def compute_network_surface(baseSrf, clusters, gridSize):
         surfaces.append(surface)
 
     return surfaces
+
+def pulled_pts_to_pcloud(pcloud, surface, ptList):
+    final_pts = []
+
+    #get normals
+    closestPt = [surface.ClosestPoint(pt) for pt in ptList]
+    normalsOnSurf = [surface.NormalAt(cp[1], cp[2]) for cp in closestPt]
+
+    #get Rtree
+    rtree = rg.RTree.PointCloudKNeighbors(pcloud, ptList, 50) #neighbour size is predefined
+    neighbours_tolist = []
+    for nn in rtree:
+        ids = []
+        for n in nn:
+            ids.append(n)
+        neighbours_tolist.append(ids)
+
+    #get angles from neighbours
+    for idx, pt in enumerate(ptList):
+        neighbours = neighbours_tolist[idx]
+        angles = []
+        for nId in neighbours:
+            ptTarget = pcloud.PointAt(nId)
+            targetVec = ptTarget - pt
+            angle = rg.Vector3d.VectorAngle(normalsOnSurf[idx], targetVec)
+            angles.append(angle)
+        
+        #sort angles
+        sortedAngles_id = sorted(range(len(angles)), key=lambda x: angles[x])
+        selectedNeighbour_id = neighbours[sortedAngles_id[0]]
+        selectedNeighbour = pcloud.PointAt(selectedNeighbour_id)
+
+        #project selected neighbour to normal on surface
+        line = rg.Line(pt, normalsOnSurf[idx], 10)
+        finalPt = line.ClosestPoint(selectedNeighbour, False)
+        final_pts.append(finalPt)
+
+    return final_pts
 
 def addFirstAndLastCurve(firstCrv, LastCrv, grid):
     gridList = list(grid)
@@ -303,7 +344,7 @@ def runTriangularSurface():
     temp_join = rg.Curve.JoinCurves(curves, 0.1, False)[0]
     explodedCrv = temp_join.Explode()
 
-    gridSize = 10
+    gridSize = 20
     trimmedPatch = True
 
     patch = rg.Brep.CreatePatch(geometry=geom, startingSurface=None, uSpans=20, vSpans=20,
@@ -337,7 +378,7 @@ def runTriangularSurface():
     clusters = compute_clusters(boundarySeg, final_subdCrvs)
 
     #network surface
-    final_surfaces = compute_network_surface(baseSrf, clusters, gridSize)
+    final_surfaces = compute_network_surface(pcloud, baseSrf, clusters, gridSize)
 
     #object attributes
     prop = rh.DocObjects.ObjectAttributes()

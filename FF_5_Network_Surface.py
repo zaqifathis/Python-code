@@ -95,6 +95,8 @@ def compute_network_surface(initSurf, curves, gridSize):
 
     return surface
 
+################################################################################
+
 class EscapeKeyHelper:
     # Constructor
     def __init__(self):

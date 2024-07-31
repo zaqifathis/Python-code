@@ -10,6 +10,10 @@ import Rhino as rh
 import Rhino.Geometry as rg
 from ghpythonlib.components import ConvexHull
 
+import Rhino.UI
+import Eto.Drawing as drawing
+import Eto.Forms as forms
+
 ################################################################################
 
 def get_convexhull(boundCurves):
@@ -212,11 +216,23 @@ def pulled_pts_to_pcloud(pcloud, surface, ptList):
     final_pts = []
 
     #get normals
-    closestPt = [surface.ClosestPoint(pt) for pt in ptList]
-    normalsOnSurf = [surface.NormalAt(cp[1], cp[2]) for cp in closestPt]
+    closestPt_UV = [surface.ClosestPoint(pt) for pt in ptList]
+    normalsOnSurf = [surface.NormalAt(cp[1], cp[2]) for cp in closestPt_UV]
+    closestPt = [surface.PointAt(cp[1], cp[2]) for cp in closestPt_UV]
+    vectransform = [rg.Vector3d(pt) - rg.Vector3d(0,0,0) for pt in closestPt] #transformation
+    [nm.Unitize() for nm in normalsOnSurf]
 
+    #new ptList to search
+    new_ptList = []
+    for index, nm in enumerate(normalsOnSurf):
+        nm /= 100
+        vect = vectransform[index]
+        newvec = nm + vect
+        pt = rg.Point3d(newvec.X, newvec.Y, newvec.Z)
+        new_ptList.append(pt)
+    
     #get Rtree
-    rtree = rg.RTree.PointCloudKNeighbors(pcloud, ptList, 50) #neighbour size is predefined
+    rtree = rg.RTree.PointCloudKNeighbors(pcloud, new_ptList, 50) #neighbour size is predefined
     neighbours_tolist = []
     for nn in rtree:
         ids = []
@@ -225,7 +241,7 @@ def pulled_pts_to_pcloud(pcloud, surface, ptList):
         neighbours_tolist.append(ids)
 
     #get angles from neighbours
-    for idx, pt in enumerate(ptList):
+    for idx, pt in enumerate(new_ptList):
         neighbours = neighbours_tolist[idx]
         angles = []
         for nId in neighbours:
@@ -284,6 +300,8 @@ def get_UV_points(srfFace, domain):
         Vpoints.append(vstrip)
     return Upoints, Vpoints
 
+################################################################################
+
 class EscapeKeyHelper:
     # Constructor
     def __init__(self):
@@ -300,9 +318,87 @@ class EscapeKeyHelper:
     def EscapeKeyPressed(self):
         print("exit function")
         return self.escape_key_pressed
-    
+
 ################################################################################
 
+class TriangularOptionsDialog(forms.Dialog[bool]):
+ 
+    # Dialog box Class initializer
+    def __init__(self):
+        super().__init__()
+        # Initialize dialog box
+        self.Title = 'Triangular surface Options'
+        self.Padding = drawing.Padding(10)
+        self.Resizable = False
+ 
+        # Surface type
+        self.surfacetype_label = forms.Label()
+        self.surfacetype_label.Text = "Surface type:"
+        self.surfacetype_dropdownlist = forms.DropDown()
+        self.surfacetype_dropdownlist.DataStore = ['strict', 'loose']
+        self.surfacetype_dropdownlist.SelectedIndex = 0
+
+        #Grid U
+        self.gridU_label = forms.Label()
+        self.gridU_label.Text = "U-Grid size:"
+        self.gridU_updown = forms.NumericUpDown()
+        self.gridU_updown.DecimalPlaces = 0
+        self.gridU_updown.Increment = 1
+        self.gridU_updown.MaxValue = 100
+        self.gridU_updown.MinValue = 5
+        self.gridU_updown.Value = 10
+
+        #Grid V
+        self.gridV_label = forms.Label()
+        self.gridV_label.Text = "V-Grid size:"
+        self.gridV_updown = forms.NumericUpDown()
+        self.gridV_updown.DecimalPlaces = 0
+        self.gridV_updown.Increment = 1
+        self.gridV_updown.MaxValue = 100
+        self.gridV_updown.MinValue = 5
+        self.gridV_updown.Value = 10
+ 
+        # Create the default button
+        self.DefaultButton = forms.Button()
+        self.DefaultButton.Text ='OK'
+        self.DefaultButton.Click += self.OnOKButtonClick
+ 
+        # Create the abort button
+        self.AbortButton = forms.Button()
+        self.AbortButton.Text ='Cancel'
+        self.AbortButton.Click += self.OnCloseButtonClick
+ 
+        # Create a table layout and add all the controls
+        layout = forms.DynamicLayout()
+        layout.Spacing = drawing.Size(5, 5)
+        layout.AddRow(self.surfacetype_label, self.surfacetype_dropdownlist)
+        layout.AddRow(None) # spacer
+        layout.AddRow(self.gridU_label, self.gridU_updown)
+        layout.AddRow(self.gridV_label, self.gridV_updown)
+        layout.AddRow(None) # spacer
+        layout.AddRow(self.DefaultButton, self.AbortButton)
+ 
+        # Set the dialog content
+        self.Content = layout
+ 
+    # Close button click handler
+    def OnCloseButtonClick(self, sender, e):
+        self.Close(False)
+ 
+    # OK button click handler
+    def OnOKButtonClick(self, sender, e):
+        self.Close(True)
+
+def RequestOption():
+    dialog = TriangularOptionsDialog()
+    rc = dialog.ShowModal(Rhino.UI.RhinoEtoApp.MainWindow)
+    if (rc):
+        return True, (dialog.surfacetype_dropdownlist.SelectedIndex, int(dialog.gridU_updown.Value), int(dialog.gridV_updown.Value))
+    else:
+        return False, (dialog.surfacetype_dropdownlist.SelectedIndex, int(dialog.gridU_updown.Value), int(dialog.gridV_updown.Value))
+    
+################################################################################
+    
 def runTriangularSurface():
     helper = EscapeKeyHelper()
     
@@ -322,6 +418,12 @@ def runTriangularSurface():
         preselect=False
     )
     if curves_id == None: return
+
+    bool_op, option = RequestOption()
+    tete, gridU, gridV = option
+    if bool_op == False: return
+
+    print(tete)
 
     surfaceType = rs.GetInteger("surface type: strict(0)/loose(1)?", 0,0,1)
     if (helper.EscapeKeyPressed):return 

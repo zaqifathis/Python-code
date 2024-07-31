@@ -157,13 +157,17 @@ def compute_clusters(boundarySeg, subCurves):
 
     return clusters
 
-def compute_network_surface(pcloud, baseSrf, clusters, gridSize):
-    #get domain
+def getDomain(gridSize):
     domain = []
+
     for i in range(1, gridSize):
-        step = 1/gridSize
-        domain.append(step * i)
-    
+            step = 1/gridSize
+            domain.append(step * i)
+
+    return domain
+
+def compute_network_surface(pcloud, baseSrf, clusters, gridSize):
+    domain = getDomain(gridSize)
     surfaces = []
 
     for cluster in clusters:
@@ -232,7 +236,7 @@ def pulled_pts_to_pcloud(pcloud, surface, ptList):
         new_ptList.append(pt)
     
     #get Rtree
-    rtree = rg.RTree.PointCloudKNeighbors(pcloud, new_ptList, 50) #neighbour size is predefined
+    rtree = rg.RTree.PointCloudKNeighbors(pcloud, new_ptList, 30) #neighbour size is predefined
     neighbours_tolist = []
     for nn in rtree:
         ids = []
@@ -338,25 +342,15 @@ class TriangularOptionsDialog(forms.Dialog[bool]):
         self.surfacetype_dropdownlist.DataStore = ['strict', 'loose']
         self.surfacetype_dropdownlist.SelectedIndex = 0
 
-        #Grid U
-        self.gridU_label = forms.Label()
-        self.gridU_label.Text = "U-Grid size:"
-        self.gridU_updown = forms.NumericUpDown()
-        self.gridU_updown.DecimalPlaces = 0
-        self.gridU_updown.Increment = 1
-        self.gridU_updown.MaxValue = 100
-        self.gridU_updown.MinValue = 5
-        self.gridU_updown.Value = 10
-
-        #Grid V
-        self.gridV_label = forms.Label()
-        self.gridV_label.Text = "V-Grid size:"
-        self.gridV_updown = forms.NumericUpDown()
-        self.gridV_updown.DecimalPlaces = 0
-        self.gridV_updown.Increment = 1
-        self.gridV_updown.MaxValue = 100
-        self.gridV_updown.MinValue = 5
-        self.gridV_updown.Value = 10
+        #Grid size
+        self.gridSize_label = forms.Label()
+        self.gridSize_label.Text = "Grid size:"
+        self.gridSize_updown = forms.NumericUpDown()
+        self.gridSize_updown.DecimalPlaces = 0
+        self.gridSize_updown.Increment = 1
+        self.gridSize_updown.MaxValue = 100
+        self.gridSize_updown.MinValue = 5
+        self.gridSize_updown.Value = 10
  
         # Create the default button
         self.DefaultButton = forms.Button()
@@ -373,8 +367,7 @@ class TriangularOptionsDialog(forms.Dialog[bool]):
         layout.Spacing = drawing.Size(5, 5)
         layout.AddRow(self.surfacetype_label, self.surfacetype_dropdownlist)
         layout.AddRow(None) # spacer
-        layout.AddRow(self.gridU_label, self.gridU_updown)
-        layout.AddRow(self.gridV_label, self.gridV_updown)
+        layout.AddRow(self.gridSize_label, self.gridSize_updown)
         layout.AddRow(None) # spacer
         layout.AddRow(self.DefaultButton, self.AbortButton)
  
@@ -393,9 +386,9 @@ def RequestOption():
     dialog = TriangularOptionsDialog()
     rc = dialog.ShowModal(Rhino.UI.RhinoEtoApp.MainWindow)
     if (rc):
-        return True, (dialog.surfacetype_dropdownlist.SelectedIndex, int(dialog.gridU_updown.Value), int(dialog.gridV_updown.Value))
+        return True, (dialog.surfacetype_dropdownlist.SelectedIndex, int(dialog.gridSize_updown.Value))
     else:
-        return False, (dialog.surfacetype_dropdownlist.SelectedIndex, int(dialog.gridU_updown.Value), int(dialog.gridV_updown.Value))
+        return False, (dialog.surfacetype_dropdownlist.SelectedIndex, int(dialog.gridSize_updown.Value))
     
 ################################################################################
     
@@ -420,13 +413,8 @@ def runTriangularSurface():
     if curves_id == None: return
 
     bool_op, option = RequestOption()
-    tete, gridU, gridV = option
+    surfaceType, gridSize = option
     if bool_op == False: return
-
-    print(tete)
-
-    surfaceType = rs.GetInteger("surface type: strict(0)/loose(1)?", 0,0,1)
-    if (helper.EscapeKeyPressed):return 
 
     #----------------------------------------------------------------
     
@@ -445,10 +433,8 @@ def runTriangularSurface():
     #join curves to get an ordered direction
     temp_join = rg.Curve.JoinCurves(curves, 0.1, False)[0]
     explodedCrv = temp_join.Explode()
-
-    gridSize = 20
+ 
     trimmedPatch = True
-
     patch = rg.Brep.CreatePatch(geometry=geom, startingSurface=None, uSpans=20, vSpans=20,
         trim=trimmedPatch, tangency= False, pointSpacing= 1, flexibility=1,surfacePull=1,
         fixEdges=[False,False,False,False], tolerance=0.01)

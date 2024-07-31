@@ -195,7 +195,7 @@ def compute_network_surface(pcloud, baseSrf, clusters, gridSize):
         final_pulled_Upts = [pulled_pts_to_pcloud(pcloud, baseSrf, u_pts) for u_pts in pulledUpts]
         final_pulled_Vpts = [pulled_pts_to_pcloud(pcloud, baseSrf, v_pts) for v_pts in pulledVpts]
 
-        #add first and end point to the pulled pts from boundary
+        #add first and end point to the pulled pts
         final_U_Pts = [addStartandEndPtToList(srfFace, domain[idx], 0, upts) for idx, upts in enumerate(final_pulled_Upts)]
         final_V_Pts = [addStartandEndPtToList(srfFace, domain[idx], 1, vpts) for idx, vpts in enumerate(final_pulled_Vpts)]
 
@@ -204,7 +204,6 @@ def compute_network_surface(pcloud, baseSrf, clusters, gridSize):
         grid_V_curves = [rg.Curve.CreateInterpolatedCurve(vpts, 3) for vpts in final_V_Pts]
 
         #add first and last curves to the list
-        #from bondary curves
         surfaceEdges = edgeSurf.Edges
         final_U_curves = addFirstAndLastCurve(surfaceEdges[1], surfaceEdges[3], grid_U_curves)
         final_V_curves = addFirstAndLastCurve(surfaceEdges[0], surfaceEdges[2],  grid_V_curves)
